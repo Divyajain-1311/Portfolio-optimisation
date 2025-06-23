@@ -13,7 +13,6 @@ start_date = end_date - timedelta(days=5*365)  # 5 years
 
 # ---------------------- FETCH DATA FROM YFINANCE ------------------
 adj_close_df = pd.DataFrame()
-
 for ticker in tickers:
     data = yf.download(ticker, start=start_date, end=end_date, auto_adjust=False, progress=False)
     adj_close_df[ticker] = data['Adj Close']
@@ -39,9 +38,13 @@ def neg_sharpe_ratio(weights, log_returns, cov_matrix, risk_free_rate):
     return -sharpe_ratio(weights, log_returns, cov_matrix, risk_free_rate)
 
 # --------------------- RISK-FREE RATE FROM FRED -------------------
-fred = Fred(api_key='427420e2c55c00c4e9f6ec01b66205af')  # Replace with your own API key if needed
-ten_year_treasury_rate = fred.get_series_latest_release('GS10') / 100
-risk_free_rate = ten_year_treasury_rate.iloc[-1]
+try:
+    fred = Fred(api_key='427420e2c55c00c4e9f6ec01b66205af')  # Replace with your own API key
+    rate_series = fred.get_series('GS10')
+    risk_free_rate = rate_series.dropna().iloc[-1] / 100
+except:
+    print("⚠️ Warning: Could not fetch risk-free rate from FRED. Using default 4.5%")
+    risk_free_rate = 0.045
 
 # ------------------------ OPTIMIZATION ----------------------------
 initial_weights = np.array([1 / len(tickers)] * len(tickers))
@@ -60,7 +63,7 @@ optimized_results = minimize(
 optimal_weights = optimized_results.x
 
 # ------------------------ DISPLAY RESULTS -------------------------
-print("Optimal Portfolio Weights:")
+print("✅ Optimal Portfolio Weights:")
 for ticker, weight in zip(tickers, optimal_weights):
     print(f"{ticker}: {weight:.4f}")
 
@@ -68,13 +71,13 @@ portfolio_return = expected_return(optimal_weights, log_returns)
 portfolio_volatility = standard_deviation(optimal_weights, cov_matrix)
 portfolio_sharpe = sharpe_ratio(optimal_weights, log_returns, cov_matrix, risk_free_rate)
 
-print(f"\nExpected Annual Return: {portfolio_return:.4f}")
-print(f"Expected Volatility: {portfolio_volatility:.4f}")
-print(f"Sharpe Ratio: {portfolio_sharpe:.4f}")
+print(f"\n📈 Expected Annual Return: {portfolio_return:.4f}")
+print(f"📉 Expected Volatility: {portfolio_volatility:.4f}")
+print(f"💡 Sharpe Ratio: {portfolio_sharpe:.4f}")
 
 # ----------------------- BAR CHART OF WEIGHTS ---------------------
 plt.figure(figsize=(8, 5))
-plt.bar(tickers, optimal_weights)
+plt.bar(tickers, optimal_weights, color='skyblue')
 plt.title("Optimal Portfolio Weights")
 plt.xlabel("Assets")
 plt.ylabel("Weights")
